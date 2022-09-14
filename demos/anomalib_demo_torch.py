@@ -17,7 +17,7 @@ from anomalib.post_processing import Visualizer
 from anomalib.deploy import TorchInferencer
 
 base_dir = '.'
-img_background = 'demos/resources/background_pyt.png'
+img_background = 'demos/background_pyt.png'
 
 category = ''    # obtain from the config file later
 dataset_dir = '' # obtain from the config file later

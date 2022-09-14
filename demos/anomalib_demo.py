@@ -22,7 +22,7 @@ from anomalib.models import get_model
 from anomalib.utils.callbacks import get_callbacks
 
 base_dir = '.'
-img_background = 'demos/resources/background.png'
+img_background = 'demos/background.png'
 
 category = ''    # obtain from the config file later
 dataset_dir = '' # obtain from the config file later
@@ -171,7 +171,7 @@ def infer_lightning(file_names:list, model, trainer, config, transform_config):
             col = (0, 0, 255)
             # find contours of defects and draw contours
             pm = pred[0]['pred_masks']
-            pm = (pd[0,:,:,:].permute(1,2,0).to('cpu').detach().numpy() * 255).astype(np.uint8)
+            pm = (pm[0,:,:,:].permute(1,2,0).to('cpu').detach().numpy() * 255).astype(np.uint8)
             ct, hc = cv2.findContours(pm, cv2.RETR_EXTERNAL, cv2.CHAIN_APPROX_SIMPLE)
             cv2.drawContours(im, ct, -1, color=(0,0,255), thickness=2)
         else:
