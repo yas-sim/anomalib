@@ -2,6 +2,7 @@ import os, sys
 import glob
 import time
 import random
+import shutil
 
 import cv2
 import numpy as np
@@ -16,6 +17,7 @@ from anomalib.post_processing import Visualizer
 from anomalib.deploy import TorchInferencer
 
 base_dir = '.'
+img_background = 'demos/resources/background_pyt.png'
 
 category = ''    # obtain from the config file later
 dataset_dir = '' # obtain from the config file later
@@ -25,14 +27,14 @@ hm_blend = False    # Blend heat map on to the input image
 pause_on_fault = False
 canvas = None
 
-threshold = 0.45    # Threshold value for predict_score
+threshold = 0.5     # Threshold value for predict_score
 hm_weight = 0.8     # Heatmap and input image blending ratio
 
 class Dataset:
     def __init__(self):
         self.bad_image_dirs = []
         self.good_image_dirs = []
-        self.find_classes(os.path.join(base_dir, 'datasets/MVTec/{}/test'.format(category)))
+        self.find_classes(os.path.join(base_dir, f'datasets/MVTec/{category}/test'))
         print(self.bad_image_dirs)
         print(self.good_image_dirs)
         self.bad_images = []
@@ -117,7 +119,7 @@ def draw_bar_graph(fps:float, ypos:int, ywid:int=40, maxfps:float=30):
     xval = int((x1-x0)*(fps/maxfps)+x0)
     cv2.rectangle(canvas, (x0, y0), (x1, y1), (0,0,0), -1)
     cv2.rectangle(canvas, (x0, y0), (xval, y1), (255,128,0), -1)
-    text = '{:4.2f}'.format(fps)
+    text = f'{fps:4.2f}'
     cv2.putText(canvas, text, ((1920 // 16) * 4, y0 + 36), cv2.FONT_HERSHEY_PLAIN, 3, (64,0,0), 3)
 
 
@@ -161,7 +163,7 @@ def infer_torch(file_names:list, inferencer):
         fault = False
         if score >= threshold:
             fault = True
-            col = (0,0,255)
+            col = (0, 0, 255)
             # find contours of defects and draw contours
             pm = (np.expand_dims(predictions.pred_mask, 2) * 255).astype(np.uint8)
             pm = cv2.resize(pm, (256, 256))
@@ -169,7 +171,7 @@ def infer_torch(file_names:list, inferencer):
             cv2.drawContours(im, ct, -1, color=(0,0,255), thickness=2)
         else:
             col = (0,255,0)
-        score_text = '{:4.3f}'.format(score)
+        score_text = f'{score:4.3f}'
         cv2.rectangle(im, (0,0), (im.shape[0]-1, im.shape[1]-1), col, 6)
         cv2.putText(im, score_text, (10, 30), cv2.FONT_HERSHEY_PLAIN, 2, (0,0,0), 4)
         cv2.putText(im, score_text, (10, 30), cv2.FONT_HERSHEY_PLAIN, 2, col, 2)
@@ -236,8 +238,8 @@ def infer_openvino(file_names:list, inferencer):
             ct, hc = cv2.findContours(pm, cv2.RETR_EXTERNAL, cv2.CHAIN_APPROX_SIMPLE)
             cv2.drawContours(im, ct, -1, color=(0,0,255), thickness=2)
         else:
-            col = (0,255,0)
-        score_text = '{:4.3f}'.format(score)
+            col = (0, 255, 0)
+        score_text = f'{score:4.3f}'
         cv2.rectangle(im, (0,0), (im.shape[0]-1, im.shape[1]-1), col, 6)
         cv2.putText(im, score_text, (10, 30), cv2.FONT_HERSHEY_PLAIN, 2, (0,0,0), 4)
         cv2.putText(im, score_text, (10, 30), cv2.FONT_HERSHEY_PLAIN, 2, col, 2)
@@ -284,18 +286,17 @@ def main():
     dataset.set_yield_rate(0.7)
 
     # Initialize Pytorch
-    pyt_model = './results/padim/mvtec/{}/weights/model.ckpt'.format(category)
-    meta_data = os.path.join(base_dir, 'results/padim/mvtec/{}/openvino/meta_data.json'.format(category))
+    pyt_model = f'./results/padim/mvtec/{category}/weights/model.ckpt'
+    meta_data = os.path.join(base_dir, f'results/padim/mvtec/{category}/openvino/meta_data.json')
     pyt_inferencer = TorchInferencer(config=config, model_source=pyt_model, meta_data_path=meta_data)
 
     # Initialize OpenVINO
-    ov_model = os.path.join(base_dir, 'results/padim/mvtec/{}/openvino/model.bin'.format(category))
-    meta_data = os.path.join(base_dir, 'results/padim/mvtec/{}/openvino/meta_data.json'.format(category))
+    ov_model = os.path.join(base_dir, f'results/padim/mvtec/{category}/openvino/model.bin')
+    meta_data = os.path.join(base_dir, f'results/padim/mvtec/{category}/openvino/meta_data.json')
     ov_inferencer = OpenVINOInferencer(config=config, path=ov_model, meta_data_path=meta_data)
 
     # Grab full screen
-    #canvas = np.full((1080, 1920, 3), 128, np.uint8)
-    canvas = cv2.imread(os.path.join(base_dir, 'demos/resources/background_pyt.png'))
+    canvas = cv2.imread(os.path.join(base_dir, img_background))
     cv2.namedWindow('screen', cv2.WINDOW_NORMAL)
     cv2.setWindowProperty('screen', cv2.WND_PROP_FULLSCREEN, cv2.WINDOW_FULLSCREEN)
     cv2.imshow('screen', canvas)

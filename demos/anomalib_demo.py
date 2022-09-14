@@ -2,6 +2,7 @@ import os, sys
 import glob
 import time
 import random
+import shutil
 
 import cv2
 import numpy as np
@@ -38,7 +39,7 @@ class Dataset:
     def __init__(self):
         self.bad_image_dirs = []
         self.good_image_dirs = []
-        self.find_classes(os.path.join(base_dir, 'datasets/MVTec/{}/test'.format(category)))
+        self.find_classes(os.path.join(base_dir, f'datasets/MVTec/{category}/test'))
         print(self.bad_image_dirs)
         print(self.good_image_dirs)
         self.bad_images = []
@@ -123,7 +124,7 @@ def draw_bar_graph(fps:float, ypos:int, ywid:int=40, maxfps:float=30):
     xval = int((x1-x0)*(fps/maxfps)+x0)
     cv2.rectangle(canvas, (x0, y0), (x1, y1), (0,0,0), -1)
     cv2.rectangle(canvas, (x0, y0), (xval, y1), (255,128,0), -1)
-    text = '{:4.2f}'.format(fps)
+    text = f'{fps:4.2f}'
     cv2.putText(canvas, text, ((1920 // 16) * 4, y0 + 36), cv2.FONT_HERSHEY_PLAIN, 3, (64,0,0), 3)
 
 
@@ -135,6 +136,7 @@ avg_openvino.set_num(5)
 def infer_lightning(file_names:list, model, trainer, config, transform_config):
     global canvas, avg_lightning, exit_flag
     global hm_blend, pause_on_fault
+
     inftime = 0
     x0 = ((1920//2)-512)//2
     y0 = 200
@@ -147,7 +149,7 @@ def infer_lightning(file_names:list, model, trainer, config, transform_config):
         pred = trainer.predict(model=model, dataloaders=[dataloader])
         # dict_keys(['image(1,3,256,256)', 'image_path', 'anomaly_maps(1,1,256,256)', 'pred_scores', 'pred_labels[1]', 'pred_masks(1,1,256,256)'])
         einf = time.time()
-        inftime = einf-sinf
+        inftime = einf - sinf
 
         # Post Process ------------------------------------------------------------------------
         # heat map
@@ -168,13 +170,13 @@ def infer_lightning(file_names:list, model, trainer, config, transform_config):
             fault = True
             col = (0, 0, 255)
             # find contours of defects and draw contours
-            pd = pred[0]['pred_masks']
-            pd = (pd[0,:,:,:].permute(1,2,0).to('cpu').detach().numpy() * 255).astype(np.uint8)
-            ct, hc = cv2.findContours(pd, cv2.RETR_EXTERNAL, cv2.CHAIN_APPROX_SIMPLE)
+            pm = pred[0]['pred_masks']
+            pm = (pd[0,:,:,:].permute(1,2,0).to('cpu').detach().numpy() * 255).astype(np.uint8)
+            ct, hc = cv2.findContours(pm, cv2.RETR_EXTERNAL, cv2.CHAIN_APPROX_SIMPLE)
             cv2.drawContours(im, ct, -1, color=(0,0,255), thickness=2)
         else:
             col = (0,255,0)
-        score_text = '{:4.3f}'.format(score)
+        score_text = f'{score:4.3f}'
         cv2.rectangle(im, (0,0), (im.shape[0]-1, im.shape[1]-1), col, 6)
         cv2.putText(im, score_text, (10, 30), cv2.FONT_HERSHEY_PLAIN, 2, (0,0,0), 4)
         cv2.putText(im, score_text, (10, 30), cv2.FONT_HERSHEY_PLAIN, 2, col, 2)
@@ -242,7 +244,7 @@ def infer_openvino(file_names:list, inferencer):
             cv2.drawContours(im, ct, -1, color=(0,0,255), thickness=2)
         else:
             col = (0, 255, 0)
-        score_text = '{:4.3f}'.format(score)
+        score_text = f'{score:4.3f}'
         cv2.rectangle(im, (0,0), (im.shape[0]-1, im.shape[1]-1), col, 6)
         cv2.putText(im, score_text, (10, 30), cv2.FONT_HERSHEY_PLAIN, 2, (0,0,0), 4)
         cv2.putText(im, score_text, (10, 30), cv2.FONT_HERSHEY_PLAIN, 2, col, 2)
@@ -266,7 +268,6 @@ def infer_openvino(file_names:list, inferencer):
         elif key == ord('h'):
             hm_blend = False if hm_blend else True
 
-import shutil
 
 def main():
     global canvas
@@ -290,7 +291,7 @@ def main():
     dataset.set_yield_rate(0.7)
 
     # Initialize Pytorch Lightning
-    ptl_weights = os.path.join(base_dir, 'results/padim/mvtec/{}/weights/model.ckpt'.format(category))
+    ptl_weights = os.path.join(base_dir, f'results/padim/mvtec/{category}/weights/model.ckpt')
     ptl_config = get_configurable_parameters(config_path=config)
     ptl_config.trainer.resume_from_checkpoint = str(ptl_weights)
     ptl_config.visualization.show_images = False
@@ -302,8 +303,8 @@ def main():
     ptl_transform_config = ptl_config.dataset.transform_config.val if "transform_config" in ptl_config.dataset.keys() else None
 
     # Initialize OpenVINO
-    ov_model = os.path.join(base_dir, 'results/padim/mvtec/{}/openvino/model.bin'.format(category))
-    meta_data = os.path.join(base_dir, 'results/padim/mvtec/{}/openvino/meta_data.json'.format(category))
+    ov_model = os.path.join(base_dir, f'results/padim/mvtec/{category}/openvino/model.bin')
+    meta_data = os.path.join(base_dir, f'results/padim/mvtec/{category}/openvino/meta_data.json')
     ov_inferencer = OpenVINOInferencer(config=config, path=ov_model, meta_data_path=meta_data)
 
     # Grab full screen
@@ -320,7 +321,7 @@ def main():
         infer_lightning(file_names, ptl_model, ptl_trainer, ptl_config, ptl_transform_config)
         if exit_flag == True:
             return
-        shutil.rmtree(os.path.join(base_dir, 'results/padim/mvtec/{}/lightning_logs/'.format(category))) # Delete unnecessary log files
+        shutil.rmtree(os.path.join(base_dir, f'results/padim/mvtec/{category}/lightning_logs/')) # Delete unnecessary log files
 
         infer_openvino(file_names, ov_inferencer)
         if exit_flag == True:
